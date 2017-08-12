@@ -5,7 +5,8 @@ Written with the NUCLEO-F746GZ in mind, it performs the following functions:
 * Appropriately prescale system clocks (AHB, APB1, APB2, FLASH)
 * Switch SYSCLK input to PLL output
 * Enable both clock outputs for PLL output (PA8) and SYSCLK output (PC9)
-* Toggle GPIO PB7
+* Initialize SysTick
+* Toggle GPIO PB7 every 500ms
 
 ## Programming Instructions
 There are three ways to program the NUCLEO-F746GZ Board. Warning: Combining these three methods may require an unplug/plug to get the system working again

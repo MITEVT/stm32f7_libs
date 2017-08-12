@@ -35,7 +35,6 @@ CORE = cortex-m7
 
 # device family
 FAMILY = STM32F746xx
-FAMILY_LC = $(shell echo $(FAMILY) | tr 'A-Z' 'a-z')
 
 # linker script
 LD_SCRIPT = linker/STM32F746ZGTx_FLASH.ld
@@ -77,8 +76,8 @@ AS_EXT = s
 
 # wildcard for ASM source files (all files with AS_EXT extension found in
 # current folder and SRCS_DIRS folders will be compiled and linked)
-AS_SRC = $(wildcard $(patsubst %, %/*.$(AS_EXT), . $(SRCS_DIRS))) 
-AS_SRCS = $(AS_SRC) ../stm32f7_cube/cmsis_dev_startup/startup_$(FAMILY_LC).s
+AS_SRCS = $(wildcard $(patsubst %, %/*.$(AS_EXT), . $(SRCS_DIRS))) 
+
 
 # optimization flags ("-O0" - no optimization, "-O1" - optimize, "-O2" -
 # optimize even more, "-Os" - optimize for size or "-O3" - optimize yet more) 
@@ -99,10 +98,9 @@ C_STD = gnu99
 #=============================================================================#
 
 MOUNT = /Volumes/NODE_F746ZG/
-OCD_FLAGS = 
 
 #=============================================================================#
-# set the VPATH according to SRCS_DIRS
+# set the VPATH according to SRCS_DIRS and startup file directory
 #=============================================================================#
 
 VPATH = $(SRCS_DIRS) ../stm32f7_cube/cmsis_dev_startup
@@ -144,7 +142,8 @@ AS_FLAGS = -g -ggdb3 -Wa,-amhls=$(OUT_DIR_F)$(notdir $(<:.$(AS_EXT)=.lst))
 # flags for linker
 LD_FLAGS = -T$(LD_SCRIPT) -g -Wl,-Map=$(OUT_DIR_F)$(PROJECT).map,--cref
 
-OCD_FLAGS_F = $(OCD_FLAGS) -f openocd.cfg
+OCD_FLAGS = -f openocd.cfg
+
 # process option for removing unused code
 ifeq ($(REMOVE_UNUSED), 1)
 	# enable garbage collection of unused sections
@@ -157,8 +156,12 @@ endif
 # do some formatting
 #=============================================================================#
 
+FAMILY_LC = $(shell echo $(FAMILY) | tr 'A-Z' 'a-z')
+
+AS_SRCS_F = $(AS_SRCS) ../stm32f7_cube/cmsis_dev_startup/startup_$(FAMILY_LC).s
+
 C_OBJS = $(addprefix $(OUT_DIR_F), $(notdir $(C_SRCS:.$(C_EXT)=.o)))
-AS_OBJS = $(addprefix $(OUT_DIR_F), $(notdir $(AS_SRCS:.$(AS_EXT)=.o)))
+AS_OBJS = $(addprefix $(OUT_DIR_F), $(notdir $(AS_SRCS_F:.$(AS_EXT)=.o)))
 OBJS = $(AS_OBJS) $(C_OBJS) $(USER_OBJS)
 DEPS = $(OBJS:.o=.d)
 INC_DIRS_F = -I. $(patsubst %, -I%, $(INC_DIRS))
@@ -197,7 +200,7 @@ $(ELF) : $(LD_SCRIPT)
 
 $(ELF) : $(OBJS)
 	@echo 'Linking target: $(ELF)'
-	@echo $(AS_SRCS)
+	@echo $(AS_SRCS_F)
 	$(CC) $(LD_FLAGS_F) $(OBJS) $(LIBS) -o $@
 	@echo ' '
 
@@ -287,23 +290,15 @@ make_output_dir :
 
 copy: all
 	@echo "Writing to" $(MOUNT)
-	cp $(BIN) $(MOUNT)
+	@cp $(BIN) $(MOUNT)
 
 #-----------------------------------------------------------------------------#
 # Write to flash of chip with ocd
 #-----------------------------------------------------------------------------#
 
 program: all
-	@echo "Programming $(TARGET) with OCD"
-	$(OCD) -s $(OCD_DIR) $(OCD_SCRIPT) $(OCD_FLAGS_F) -c "program $(ELF) verify reset exit"
-
-#-----------------------------------------------------------------------------#
-# Open up in picocom
-#-----------------------------------------------------------------------------#
-
-com:
-	@echo "Opening" $(COMPORT) "with baud" $(BAUDRATE)
-	picocom -b $(BAUDRATE) $(COMPORT)
+	@echo "Programming" $(ELF) "with OCD"
+	@$(OCD) -s $(OCD_DIR) $(OCD_FLAGS) -c "program $(ELF) verify reset exit"
 
 #=============================================================================#
 # make clean

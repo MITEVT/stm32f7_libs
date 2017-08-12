@@ -1,5 +1,10 @@
 #include <stm32f7xx.h>
 
+volatile uint32_t ticks_ms;
+void SysTick_Handler(void) {
+	ticks_ms++;
+}
+
 int main(void) {
 
 	// Enable PLL and set as SYSCLK (216MHz)
@@ -8,12 +13,16 @@ int main(void) {
 	// f_vco = f_in * PLLN / PLLM = 432 Mhz -> PLLN = 216
 	// f_out = f_vco / PLLP = 216 Mhz -> PLLP = 2
 	// f_out2 = f_vco / PLLQ = 48 Mhz -> PLLQ = 9
+	#define PLLM 8U
+	#define PLLN 216U
+	#define PLLP 2U
+	#define PLLQ 9U
 	RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLSRC; // HSI as source
 	RCC->PLLCFGR &= ~(RCC_PLLCFGR_PLLM | RCC_PLLCFGR_PLLN | RCC_PLLCFGR_PLLP | RCC_PLLCFGR_PLLQ);
-	RCC->PLLCFGR |= 8U << RCC_PLLCFGR_PLLM_Pos;
-	RCC->PLLCFGR |= 216U << RCC_PLLCFGR_PLLN_Pos;
-	RCC->PLLCFGR |= 0U << RCC_PLLCFGR_PLLP_Pos; // PLLP=2
-	RCC->PLLCFGR |= 9U << RCC_PLLCFGR_PLLQ_Pos;
+	RCC->PLLCFGR |= PLLM << RCC_PLLCFGR_PLLM_Pos;
+	RCC->PLLCFGR |= PLLN << RCC_PLLCFGR_PLLN_Pos;
+	RCC->PLLCFGR |= ((PLLP >> 1) - 1) << RCC_PLLCFGR_PLLP_Pos;
+	RCC->PLLCFGR |= PLLQ << RCC_PLLCFGR_PLLQ_Pos;
 
 	RCC->CR |= RCC_CR_PLLON; // Enable PLL
 	RCC->APB1ENR |= RCC_APB1ENR_PWREN; // Enable PWR
@@ -38,7 +47,7 @@ int main(void) {
 	RCC->CFGR |= 6U << RCC_CFGR_MCO2PRE_Pos; // Prescale by 4
 
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; // Enable Port C
-	GPIOC->OSPEEDR |= 1U << GPIO_OSPEEDER_OSPEEDR9_Pos; // Medium Speed
+	GPIOC->OSPEEDR |= 3U << GPIO_OSPEEDER_OSPEEDR9_Pos; // Very High Speed
 	GPIOC->MODER &= ~GPIO_MODER_MODER9;
 	GPIOC->MODER |= GPIO_MODER_MODER9_1; // 0b10 - Alternate Mode
 	GPIOC->AFR[1] &= ~GPIO_AFRH_AFRH1; // Alternate Mode 0 (8 + AFRH1 = AFRH9)
@@ -54,6 +63,10 @@ int main(void) {
 	GPIOA->MODER |= GPIO_MODER_MODER8_1; // 0b10 - Alternate Mode
 	GPIOA->AFR[1] &= ~GPIO_AFRH_AFRH0; // Alternate Mode 0 (8 + AFRH0 = AFRH8)
 
+	// Initialize SysTick
+	ticks_ms = 0;
+	SystemCoreClockUpdate();
+	SysTick_Config(SystemCoreClock/1000);
 
 	// Blue LED PB7
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; // Enable clock to GPIOB
@@ -62,8 +75,12 @@ int main(void) {
 	GPIOB->MODER |= GPIO_MODER_MODER7_0; // Set as output
 	GPIOB->ODR &= ~GPIO_ODR_ODR_7;
 
+	uint32_t last_ms = ticks_ms;
 	while (1) {
-		GPIOB->ODR ^= GPIO_ODR_ODR_7;
+		if (ticks_ms - last_ms > 500) {
+			GPIOB->ODR ^= GPIO_ODR_ODR_7;
+			last_ms = ticks_ms;
+		}
 	}
 
 
