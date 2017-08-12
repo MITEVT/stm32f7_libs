@@ -8,7 +8,7 @@ Written with the NUCLEO-F746GZ in mind, it performs the following functions:
 * Toggle GPIO PB7
 
 ## Programming Instructions
-There are three ways to program the NUCLEO-F746GZ Board
+There are three ways to program the NUCLEO-F746GZ Board. Warning: Combining these three methods may require an unplug/plug to get the system working again
 ### Manual Copy
 Copy the .bin file generated in the bin directory to the enumerated USB Mass Storage Device. It should disconnect and then reenumerate. This approach is simple but it cause the ST-Link itself to reset and reenumerate.
 ### Scripted Copy
