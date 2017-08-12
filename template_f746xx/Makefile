@@ -20,6 +20,9 @@ OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
 RM = rm -f
 
+OCD_DIR = /usr/local/share/openocd/scripts
+OCD = openocd
+
 #=============================================================================#
 # project configuration
 #=============================================================================#
@@ -95,9 +98,8 @@ C_STD = gnu99
 # Write Configuration
 #=============================================================================#
 
-MOUNT = /Volumes/NUCLEO/
-COMPORT = $(word 1, $(wildcard /dev/tty.usbmodem*) $(wildcard /dev/ttyUSB*))
-BAUDRATE = 9600
+MOUNT = /Volumes/NODE_F746ZG/
+OCD_FLAGS = 
 
 #=============================================================================#
 # set the VPATH according to SRCS_DIRS
@@ -126,7 +128,7 @@ else
 endif
 
 #=============================================================================#
-# various compilation flags
+# various compilation/programming flags
 #=============================================================================#
 
 # core flags
@@ -142,6 +144,7 @@ AS_FLAGS = -g -ggdb3 -Wa,-amhls=$(OUT_DIR_F)$(notdir $(<:.$(AS_EXT)=.lst))
 # flags for linker
 LD_FLAGS = -T$(LD_SCRIPT) -g -Wl,-Map=$(OUT_DIR_F)$(PROJECT).map,--cref
 
+OCD_FLAGS_F = $(OCD_FLAGS) -f openocd.cfg
 # process option for removing unused code
 ifeq ($(REMOVE_UNUSED), 1)
 	# enable garbage collection of unused sections
@@ -279,13 +282,20 @@ make_output_dir :
 	$(shell mkdir $(OUT_DIR_F) 2>/dev/null)
 
 #-----------------------------------------------------------------------------#
-# Write to flash of chip
+# Write to flash of chip by copying to enumerated mass storage device
 #-----------------------------------------------------------------------------#
 
-writeflash: all
+copy: all
 	@echo "Writing to" $(MOUNT)
 	cp $(BIN) $(MOUNT)
 
+#-----------------------------------------------------------------------------#
+# Write to flash of chip with ocd
+#-----------------------------------------------------------------------------#
+
+program: all
+	@echo "Programming $(TARGET) with OCD"
+	$(OCD) -s $(OCD_DIR) $(OCD_SCRIPT) $(OCD_FLAGS_F) -c "program $(ELF) verify reset exit"
 
 #-----------------------------------------------------------------------------#
 # Open up in picocom
