@@ -7,12 +7,15 @@ void SysTick_Handler(void) {
 
 int main(void) {
 
-	// Enable PLL and set as SYSCLK (216MHz)
-	// f_in = 16Mhz
-	// f_in / PLLM = 2Mhz -> PLLM = 8
-	// f_vco = f_in * PLLN / PLLM = 432 Mhz -> PLLN = 216
-	// f_out = f_vco / PLLP = 216 Mhz -> PLLP = 2
-	// f_out2 = f_vco / PLLQ = 48 Mhz -> PLLQ = 9
+	/* Enable PLL and set as SYSCLK (216MHz)
+	 * See User Manual Section 5.3.2
+	 *
+	 * f_in = 16Mhz
+	 * f_in / PLLM = 2Mhz -> PLLM = 8
+	 * f_vco = f_in * PLLN / PLLM = 432 Mhz -> PLLN = 216
+	 * f_out = f_vco / PLLP = 216 Mhz -> PLLP = 2
+	 * f_out2 = f_vco / PLLQ = 48 Mhz -> PLLQ = 9
+	 */
 	#define PLLM 8U
 	#define PLLN 216U
 	#define PLLP 2U
@@ -24,6 +27,10 @@ int main(void) {
 	RCC->PLLCFGR |= ((PLLP >> 1) - 1) << RCC_PLLCFGR_PLLP_Pos;
 	RCC->PLLCFGR |= PLLQ << RCC_PLLCFGR_PLLQ_Pos;
 
+	/* Start PLL and enable over drive mode for high frequency
+	 * switching. Also ensure components have appropriate freqs.
+	 * See User Manual Sections 3.3.2, 4.1.4 and Data Sheet 5.3.1
+	 */
 	RCC->CR |= RCC_CR_PLLON; // Enable PLL
 	RCC->APB1ENR |= RCC_APB1ENR_PWREN; // Enable PWR
 	PWR->CR1 |= PWR_CR1_ODEN; // Enable overdrive mode
@@ -41,18 +48,9 @@ int main(void) {
 	RCC->CFGR |= 2 << RCC_CFGR_SW_Pos; // Switch to PLL
 	while(!(RCC->CFGR & (0x2 << RCC_CFGR_SWS_Pos)));
 
-	// Configure SYSCLK out on MCO2 (PC9)
-	RCC->CFGR &= ~RCC_CFGR_MCO2; // Set MCO2 = 0 for SYSCLK
-	RCC->CFGR &= ~RCC_CFGR_MCO2PRE; // clear prescaler
-	RCC->CFGR |= 6U << RCC_CFGR_MCO2PRE_Pos; // Prescale by 4
-
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; // Enable Port C
-	GPIOC->OSPEEDR |= 3U << GPIO_OSPEEDER_OSPEEDR9_Pos; // Very High Speed
-	GPIOC->MODER &= ~GPIO_MODER_MODER9;
-	GPIOC->MODER |= GPIO_MODER_MODER9_1; // 0b10 - Alternate Mode
-	GPIOC->AFR[1] &= ~GPIO_AFRH_AFRH1; // Alternate Mode 0 (8 + AFRH1 = AFRH9)
-
-	// Configure PLL out on MCO1 (PA8)
+	/* Configure SYSCLK out on MCO2 (PC9) and PLL out MCO1 (PA8)
+	 * See User Manual Sections 5.2.10
+	 */
 	RCC->CFGR |= RCC_CFGR_MCO1; // Set MCO1 = 3 for PLL
 	RCC->CFGR &= ~RCC_CFGR_MCO1PRE; // clear prescaler
 	RCC->CFGR |= 6U << RCC_CFGR_MCO1PRE_Pos; // Prescale by 4
@@ -62,6 +60,16 @@ int main(void) {
 	GPIOA->MODER &= ~GPIO_MODER_MODER8;
 	GPIOA->MODER |= GPIO_MODER_MODER8_1; // 0b10 - Alternate Mode
 	GPIOA->AFR[1] &= ~GPIO_AFRH_AFRH0; // Alternate Mode 0 (8 + AFRH0 = AFRH8)
+
+	RCC->CFGR &= ~RCC_CFGR_MCO2; // Set MCO2 = 0 for SYSCLK
+	RCC->CFGR &= ~RCC_CFGR_MCO2PRE; // clear prescaler
+	RCC->CFGR |= 6U << RCC_CFGR_MCO2PRE_Pos; // Prescale by 4
+
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; // Enable Port C
+	GPIOC->OSPEEDR |= 3U << GPIO_OSPEEDER_OSPEEDR9_Pos; // Very High Speed
+	GPIOC->MODER &= ~GPIO_MODER_MODER9;
+	GPIOC->MODER |= GPIO_MODER_MODER9_1; // 0b10 - Alternate Mode
+	GPIOC->AFR[1] &= ~GPIO_AFRH_AFRH1; // Alternate Mode 0 (8 + AFRH1 = AFRH9)
 
 	// Initialize SysTick
 	ticks_ms = 0;

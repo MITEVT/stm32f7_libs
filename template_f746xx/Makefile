@@ -36,6 +36,8 @@ CORE = cortex-m7
 # device family
 FAMILY = STM32F746xx
 
+CUBE_DIR = ../stm32f7_cube
+
 # linker script
 LD_SCRIPT = linker/STM32F746ZGTx_FLASH.ld
 
@@ -50,11 +52,11 @@ AS_DEFS = -D__STARTUP_CLEAR_BSS
 
 # include directories (absolute or relative paths to additional folders with
 # headers, current folder is always included)
-INC_DIRS = inc ../stm32f7_cube/cmsis_inc ../stm32f7_cube/cmsis_dev_inc
+INC_DIRS = inc $(CUBE_DIR)/cmsis_inc $(CUBE_DIR)/cmsis_dev_inc $(CUBE_DIR)/hal_inc
 
 # library directories (absolute or relative paths to additional folders with
 # libraries)
-LIB_DIRS = ../stm32f7_cube/cmsis_lib/
+LIB_DIRS = $(CUBE_DIR)/cmsis_lib/
 
 # libraries (additional libraries for linking, e.g. "-lm -lsome_name" to link
 # math library libm.a and libsome_name.a)
@@ -103,7 +105,7 @@ MOUNT = /Volumes/NODE_F746ZG/
 # set the VPATH according to SRCS_DIRS and startup file directory
 #=============================================================================#
 
-VPATH = $(SRCS_DIRS) ../stm32f7_cube/cmsis_dev_startup
+VPATH = $(SRCS_DIRS) $(CUBE_DIR)/cmsis_dev_startup
 
 #=============================================================================#
 # when using output folder, append trailing slash to its name
@@ -158,7 +160,7 @@ endif
 
 FAMILY_LC = $(shell echo $(FAMILY) | tr 'A-Z' 'a-z')
 
-AS_SRCS_F = $(AS_SRCS) ../stm32f7_cube/cmsis_dev_startup/startup_$(FAMILY_LC).s
+AS_SRCS_F = $(AS_SRCS) $(CUBE_DIR)/cmsis_dev_startup/startup_$(FAMILY_LC).s
 
 C_OBJS = $(addprefix $(OUT_DIR_F), $(notdir $(C_SRCS:.$(C_EXT)=.o)))
 AS_OBJS = $(addprefix $(OUT_DIR_F), $(notdir $(AS_SRCS_F:.$(AS_EXT)=.o)))
