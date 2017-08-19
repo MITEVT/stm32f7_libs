@@ -20,8 +20,8 @@ OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
 RM = rm -f
 
-OCD_DIR = /usr/local/share/openocd/scripts
 OCD = openocd
+OCD_DIR = /usr/local/share/openocd/scripts
 
 #=============================================================================#
 # project configuration
@@ -300,6 +300,8 @@ copy: all
 
 program: all
 	@echo "Programming" $(ELF) "with OCD"
+	# A little fun time magic
+	@if test ! -d $(OCD_DIR); then OCD_DIR=/usr/share/openocd/scripts; fi
 	@$(OCD) -s $(OCD_DIR) $(OCD_FLAGS) -c "program $(ELF) verify reset exit"
 
 #=============================================================================#
