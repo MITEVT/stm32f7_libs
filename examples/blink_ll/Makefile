@@ -64,16 +64,19 @@ LIBS =
 
 # additional directories with source files (absolute or relative paths to
 # folders with source files, current folder is always included)
-SRCS_DIRS = src
+SRCS_DIRS = src $(CUBE_DIR)/hal_src
 
 # extension of C files
 C_EXT = c
 
-LL_SRCS = stm32f7xx_ll_gpio.c stm32f7xx_ll_rcc.c stm32f7xx_ll_utils.c
+LL_SRCS = #stm32f7xx_ll_gpio.c stm32f7xx_ll_rcc.c stm32f7xx_ll_utils.c
 
 # wildcard for C source files (all files with C_EXT extension found in current
 # folder and SRCS_DIRS folders will be compiled and linked)
-C_SRCS = $(wildcard $(patsubst %, %/*.$(C_EXT), . $(SRCS_DIRS))) $(addprefix $(CUBE_DIR)/hal_src/, $(LL_SRCS))
+C_SRCS1 = $(wildcard $(patsubst %, %/*.$(C_EXT), . $(SRCS_DIRS))) $(addprefix $(CUBE_DIR)/hal_src/, $(LL_SRCS))
+FILTER_OUT = $(foreach v,$(2),$(if $(findstring $(1),$(v)),,$(v)))
+C_SRCS = $(call FILTER_OUT,template, $(C_SRCS1))
+
 
 # extension of ASM files
 AS_EXT = s
