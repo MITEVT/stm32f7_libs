@@ -40,7 +40,7 @@ int main(void) {
 
 
 	LL_USART_InitTypeDef USART3Init;
-	USART3Init.BaudRate = 9600;
+	USART3Init.BaudRate = UART_BAUD; // Set in the makefile
 	USART3Init.DataWidth = LL_USART_DATAWIDTH_8B;
 	USART3Init.StopBits = LL_USART_STOPBITS_1;
 	USART3Init.Parity = LL_USART_PARITY_NONE;
