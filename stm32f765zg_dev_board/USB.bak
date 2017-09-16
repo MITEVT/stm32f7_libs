@@ -36,11 +36,12 @@ LIBS:MITEVT_OPTO
 LIBS:MITEVT_power
 LIBS:MITEVT_REG
 LIBS:MITEVT_relay
+LIBS:stm32f765zg_dev_board-cache
 EELAYER 25 0
 EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
-Sheet 1 9
+Sheet 8 9
 Title ""
 Date ""
 Rev ""
