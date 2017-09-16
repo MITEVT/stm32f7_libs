@@ -40,7 +40,7 @@ EELAYER 25 0
 EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
-Sheet 1 8
+Sheet 1 9
 Title ""
 Date ""
 Rev ""
@@ -53,19 +53,19 @@ $EndDescr
 $Sheet
 S 2750 2300 1950 1650
 U 59BD7127
-F0 "Sheet59BD7126" 60
+F0 "power" 60
 F1 "power.sch" 60
 $EndSheet
 $Sheet
 S 5650 2300 1750 1650
 U 59BD7141
-F0 "Sheet59BD7140" 60
+F0 "mu_controller" 60
 F1 "mu_controller.sch" 60
 $EndSheet
 $Sheet
 S 2800 4650 1900 1500
 U 59BD7157
-F0 "Sheet59BD7156" 60
+F0 "iface" 60
 F1 "iface.sch" 60
 $EndSheet
 $EndSCHEMATC
