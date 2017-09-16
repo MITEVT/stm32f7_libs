@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name EVT_ANALOG)(type KiCad)(uri EVT_LIB/MITEVT_ANALOG.lib)(options "")(descr ""))
+)
