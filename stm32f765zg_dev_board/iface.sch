@@ -40,7 +40,7 @@ EELAYER 25 0
 EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
-Sheet 1 8
+Sheet 4 8
 Title ""
 Date ""
 Rev ""
@@ -51,21 +51,33 @@ Comment3 ""
 Comment4 ""
 $EndDescr
 $Sheet
-S 2750 2300 1950 1650
-U 59BD7127
-F0 "Sheet59BD7126" 60
-F1 "power.sch" 60
+S 2350 1800 1750 1450
+U 59BD7189
+F0 "Sheet59BD7188" 60
+F1 "CAN.sch" 60
 $EndSheet
 $Sheet
-S 5650 2300 1750 1650
-U 59BD7141
-F0 "Sheet59BD7140" 60
-F1 "mu_controller.sch" 60
+S 5250 1750 1650 1500
+U 59BD7199
+F0 "Sheet59BD7198" 60
+F1 "ISOSPI.sch" 60
 $EndSheet
 $Sheet
-S 2800 4650 1900 1500
-U 59BD7157
-F0 "Sheet59BD7156" 60
-F1 "iface.sch" 60
+S 7850 1800 1500 1450
+U 59BD71A4
+F0 "Sheet59BD71A3" 60
+F1 "LCD.sch" 60
+$EndSheet
+$Sheet
+S 2450 4100 1700 1200
+U 59BD71BA
+F0 "Sheet59BD71B9" 60
+F1 "USB.sch" 60
+$EndSheet
+$Sheet
+S 5250 4100 1650 1200
+U 59BD7205
+F0 "Sheet59BD7204" 60
+F1 "output_con.sch" 60
 $EndSheet
 $EndSCHEMATC
