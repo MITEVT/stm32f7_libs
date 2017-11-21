@@ -1,12 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
+/* STM CUBE files */
 #include "stm32f7xx.h"
-
-#include "stm32f7xx_ll_gpio.h"
-#include "stm32f7xx_ll_rcc.h"
-#include "stm32f7xx_ll_bus.h"
-#include "stm32f7xx_ll_usart.h"
+#include "stm32f7xx_hal.h"
+#include "stm32f7xx_hal_conf.h"
 
 /* FreeRTOS include files. */
 #include "FreeRTOS.h"
@@ -14,12 +12,11 @@
 #include "semphr.h"
 #include "FreeRTOS_CLI.h"
 
-
-
-// volatile uint32_t ticks_ms;
-// void SysTick_Handler(void) {
-// 	ticks_ms++;
-// }
+void SysTick_Handler(void) {
+	HAL_IncTick();
+	HAL_SYSTICK_IRQHandler();
+	xPortSysTickHandler();
+}
 
 /* Priorities at which the tasks are created. */
 #define mainCOMMAND_CONSOLE_TASK_PRIORITY	(tskIDLE_PRIORITY + 1)
@@ -36,9 +33,9 @@ the queue empty. */
 #define mainQUEUE_LENGTH					(1)
 
 /* The LED is used to show the demo status. (not connected on Rev A hardware) */
-#define mainTOGGLE_LED1()	LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_0)
-#define mainTOGGLE_LED2()	LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_7)
-#define mainTOGGLE_LED3()	LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_14)
+#define mainTOGGLE_LED1()	HAL_GPIO_TogglePin(GPIOB, LD1_PIN)
+#define mainTOGGLE_LED2()	HAL_GPIO_TogglePin(GPIOB, LD2_PIN)
+#define mainTOGGLE_LED3()	HAL_GPIO_TogglePin(GPIOB, LD3_PIN)
 
 /*-----------------------------------------------------------*/
 
@@ -47,10 +44,15 @@ the queue empty. */
  */
 static void prvSetupHardware(void);
 
+#define LD1_PIN GPIO_PIN_0
+#define LD2_PIN GPIO_PIN_7
+#define LD3_PIN GPIO_PIN_14
+
 /*
  * Configure the system clock for maximum speed.
  */
 static void prvSystemClockConfig(void);
+
 
 static void prvQueueSendTask(void *pvParameters);
 static void prvQueueReceiveTask(void *pvParameters);
@@ -64,6 +66,9 @@ void vApplicationTickHook(void);
 
 /* The queue used by both tasks. */
 static QueueHandle_t xQueue = NULL;
+
+/* Console UART Handler Type */
+static UART_HandleTypeDef usart3;
 
 /*-----------------------------------------------------------*/
 /* Command Line Definitions */
@@ -183,59 +188,27 @@ static void prvSetupHardware(void) {
 	/* Set Interrupt Group Priority */
 	NVIC_SetPriorityGrouping((uint32_t)0x00000003U);
 
-	/* Configure the System clock to have a frequency of 200 MHz */
+	/* Configure the System clock to have a frequency of 216 MHz */
 	prvSystemClockConfig();
 
-	LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB | LL_AHB1_GRP1_PERIPH_GPIOD);
-	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_USART3);
+	__HAL_RCC_GPIOB_CLK_ENABLE();
+	GPIO_InitTypeDef LED;
+	LED.Mode = GPIO_MODE_OUTPUT_PP;
+	LED.Pull = GPIO_NOPULL;
+	LED.Speed = GPIO_SPEED_FREQ_LOW;
+	LED.Pin = LD1_PIN; HAL_GPIO_Init(GPIOB, &LED);
+	LED.Pin = LD2_PIN; HAL_GPIO_Init(GPIOB, &LED);
+	LED.Pin = LD3_PIN; HAL_GPIO_Init(GPIOB, &LED);
 
-	// Green LED PB0 (LD1)
-	LL_GPIO_InitTypeDef PB0;
-	LL_GPIO_StructInit(&PB0);
-	PB0.Pin = LL_GPIO_PIN_0; PB0.Mode = LL_GPIO_MODE_OUTPUT;
-	PB0.Speed = LL_GPIO_SPEED_FREQ_LOW; PB0.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-	PB0.Pull = LL_GPIO_PULL_NO; PB0.Alternate = LL_GPIO_AF_0;
-	LL_GPIO_Init(GPIOB, &PB0);
-
-	// Blue LED PB7 (LD2)
-	LL_GPIO_InitTypeDef PB7;
-	LL_GPIO_StructInit(&PB7);
-	PB7.Pin = LL_GPIO_PIN_7; PB7.Mode = LL_GPIO_MODE_OUTPUT;
-	PB7.Speed = LL_GPIO_SPEED_FREQ_LOW; PB7.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-	PB7.Pull = LL_GPIO_PULL_NO; PB7.Alternate = LL_GPIO_AF_0;
-	LL_GPIO_Init(GPIOB, &PB7);
-
-	// Red LED PB14 (LD3)
-	LL_GPIO_InitTypeDef PB14;
-	LL_GPIO_StructInit(&PB14);
-	PB14.Pin = LL_GPIO_PIN_14; PB14.Mode = LL_GPIO_MODE_OUTPUT;
-	PB14.Speed = LL_GPIO_SPEED_FREQ_LOW; PB14.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-	PB14.Pull = LL_GPIO_PULL_NO; PB14.Alternate = LL_GPIO_AF_0;
-	LL_GPIO_Init(GPIOB, &PB14);
-
-
-	LL_GPIO_InitTypeDef PD8, PD9; // TX and RX for USART3
-	LL_GPIO_StructInit(&PD8); LL_GPIO_StructInit(&PD9);
-	PD8.Pin = LL_GPIO_PIN_8; PD8.Mode = LL_GPIO_MODE_ALTERNATE; PD8.Alternate = LL_GPIO_AF_7;
-	PD9.Pin = LL_GPIO_PIN_9; PD9.Mode = LL_GPIO_MODE_ALTERNATE; PD9.Alternate = LL_GPIO_AF_7;
-	LL_GPIO_Init(GPIOD, &PD8); LL_GPIO_Init(GPIOD, &PD9);
-
-	LL_USART_InitTypeDef USART3Init;
-	USART3Init.BaudRate = UART_BAUD;
-	USART3Init.DataWidth = LL_USART_DATAWIDTH_8B;
-	USART3Init.StopBits = LL_USART_STOPBITS_1;
-	USART3Init.Parity = LL_USART_PARITY_NONE;
-	USART3Init.TransferDirection = LL_USART_DIRECTION_TX_RX;
-	USART3Init.HardwareFlowControl = LL_USART_HWCONTROL_NONE;
-	USART3Init.OverSampling = LL_USART_OVERSAMPLING_16;
-
-	if (LL_USART_Init(USART3, &USART3Init) != SUCCESS) {
-		while(1) {
-			// Hang bc wtf
-		}
-	}
-
-	LL_USART_Enable(USART3); // Enable USART3
+	memset(&usart3, 0, sizeof(UART_HandleTypeDef)); // Prevents need to initialize unused things
+	usart3.Instance = USART3;
+	usart3.Init.BaudRate = UART_BAUD;
+	usart3.Init.WordLength = UART_WORDLENGTH_8B;
+	usart3.Init.StopBits = UART_STOPBITS_1;
+	usart3.Init.Parity = UART_PARITY_NONE;
+	usart3.Init.Mode = UART_MODE_TX_RX;
+	usart3.Init.OverSampling = USART_OVERSAMPLING_16;
+	HAL_UART_Init(&usart3);
 
 }
 
@@ -379,6 +352,8 @@ void vApplicationTickHook( void ) {
 #define MAX_INPUT_LENGTH    50
 #define MAX_OUTPUT_LENGTH   100
 
+#define CALC_UART_TIMEOUT(n) (n*1000*2/UART_BAUD + 10)
+
 static const char* const pcWelcomeMessage =
   "\r\n***************************************************\r\n \
    \t\tFreeRTOS command server.\r\nType 'help' to view a list of registered commands.\r\n>";
@@ -396,33 +371,26 @@ void vCommandConsoleTask( void *pvParameters )
     /* This code assumes the peripheral being used as the console has already
     been opened and configured, and is passed into the task as the task
     parameter.  Cast the task parameter to the correct type. */
-    xConsole = (USART_TypeDef*) pvParameters;
-    // xConsole = USART3;
+    xConsole = (UART_HandleTypeDef*) pvParameters;
+
     /* Send a welcome message to the user knows they are connected. */
     uint32_t i;
-    for (i = 0; i < strlen(pcWelcomeMessage); i++) {
-    	while(!LL_USART_IsActiveFlag_TXE(xConsole)) {taskYIELD();}
-    	LL_USART_TransmitData8(xConsole, pcWelcomeMessage[i]);
-    }
+    HAL_UART_Transmit(&usart3, pcWelcomeMessage, strlen(pcWelcomeMessage), CALC_UART_TIMEOUT(strlen(pcWelcomeMessage)));
 
 
     for( ;; )
     {
         /* This implementation reads a single character at a time. Yield if no character available */
- 		while(!LL_USART_IsActiveFlag_RXNE(xConsole)) {/*taskYIELD();*/}
- 		cRxedChar = LL_USART_ReceiveData8(xConsole);
+ 		while(HAL_UART_Receive(&usart3, &cRxedChar, 1, 1) != HAL_OK) {
+ 			vTaskDelay(1 / portTICK_PERIOD_MS);
+ 		}
 
         if( cRxedChar == '\n' || cRxedChar == '\r')
         {
             /* A newline character was received, so the input command string is
             complete and can be processed.  Transmit a line separator, just to
             make the output easier to read. */
-            while(!LL_USART_IsActiveFlag_TXE(xConsole)) {/*taskYIELD();*/}
-    		LL_USART_TransmitData8(xConsole, '\n');
-    		while(!LL_USART_IsActiveFlag_TXE(xConsole)) {/*taskYIELD();*/}
-    		LL_USART_TransmitData8(xConsole, '\r');
-    		// while(!LL_USART_IsActiveFlag_TXE(USART3)) {/*taskYIELD();*/}
-    		// LL_USART_TransmitData8(xConsole, '\n');
+    		HAL_UART_Transmit(&usart3, "\n\r", 2, CALC_UART_TIMEOUT(2));
 
             /* The command interpreter is called repeatedly until it returns
             pdFALSE.  See the "Implementing a command" documentation for an
@@ -441,10 +409,8 @@ void vCommandConsoleTask( void *pvParameters )
 
 	                /* Write the output generated by the command interpreter to the
 	                console. */
-	                for (i = 0; i < strlen(pcOutputString); i++) {
-				    	while(!LL_USART_IsActiveFlag_TXE(xConsole)) {/*taskYIELD();*/}
-				    	LL_USART_TransmitData8(xConsole, pcOutputString[i]);
-				    }
+	                
+				    HAL_UART_Transmit(&usart3, pcOutputString, strlen(pcOutputString), CALC_UART_TIMEOUT(strlen(pcOutputString)));
 	            } while( xMoreDataToFollow != pdFALSE );
 	            cInputIndex = 0;
             	memset(pcInputString, 0x00, MAX_INPUT_LENGTH);
@@ -454,8 +420,7 @@ void vCommandConsoleTask( void *pvParameters )
             /* All the strings generated by the input command have been sent.
             Processing of the command is complete.  Clear the input string ready
             to receive the next command. */
-            while(!LL_USART_IsActiveFlag_TXE(xConsole)) {/*taskYIELD();*/}
-			LL_USART_TransmitData8(xConsole, '>');
+			HAL_UART_Transmit(&usart3, ">", 1, CALC_UART_TIMEOUT(1));
         }
         else
         {
@@ -471,10 +436,7 @@ void vCommandConsoleTask( void *pvParameters )
                 if (cInputIndex > 0) {
                     cInputIndex--;
                     pcInputString[ cInputIndex ] = '\0';
-                    for (i = 0; i < strlen(pcBackSpace); i++) {
-				    	while(!LL_USART_IsActiveFlag_TXE(xConsole)) {/*taskYIELD();*/}
-				    	LL_USART_TransmitData8(xConsole, pcBackSpace[i]);
-    				}
+    				HAL_UART_Transmit(&usart3, pcBackSpace, strlen(pcBackSpace), CALC_UART_TIMEOUT(strlen(pcBackSpace)));
                 }
 
             } else {
@@ -485,8 +447,7 @@ void vCommandConsoleTask( void *pvParameters )
                 if (cInputIndex < MAX_INPUT_LENGTH) {
                     pcInputString[ cInputIndex ] = cRxedChar;
                     cInputIndex++;
-                    while(!LL_USART_IsActiveFlag_TXE(xConsole)) {/*taskYIELD();*/}
-    				LL_USART_TransmitData8(xConsole, cRxedChar);
+    				HAL_UART_Transmit(&usart3, &cRxedChar, 1, CALC_UART_TIMEOUT(1));
                 }
             }
         }
@@ -568,6 +529,33 @@ static BaseType_t prvFreqCommand(char *pcWriteBuffer,
     /* There is only a single line of output produced in all cases.  pdFALSE is
     returned because there is no more output to be generated. */
     return pdFALSE;
+}
+
+static BaseType_t prvInitADCCommand(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
+
+	// LL_ADC_InitTypeDef adc3_init = {LL_ADC_RESOLUTION_8B, LL_ADC_DATA_ALIGN_RIGHT, LL_ADC_SEQ_SCAN_DISABLE};
+	// LL_ADC_CommonInitTypeDef adc3_common = {LL_ADC_CLOCK_SYNC_PCLK_DIV2, LL_ADC_MULTI_INDEPENDENT, }
+	// LL_ADC_Init(ADC3, &adc3_init);
+	// LL_ADC_Enable(ADC3);
+
+}
+
+/*-----------------------------------------------------------*/
+/* HAL Init Functions*/
+
+void HAL_UART_MspInit(UART_HandleTypeDef *husart) {
+	if (husart->Instance == USART3) {
+		__HAL_RCC_USART3_CLK_ENABLE();
+
+		__HAL_RCC_GPIOD_CLK_ENABLE();
+		GPIO_InitTypeDef UG;
+		UG.Mode = GPIO_MODE_AF_PP;
+		UG.Pull = GPIO_PULLUP;
+		UG.Speed = GPIO_SPEED_FREQ_HIGH;
+		UG.Alternate = GPIO_AF7_USART3;
+		UG.Pin = GPIO_PIN_8; HAL_GPIO_Init(GPIOD, &UG);
+		UG.Pin = GPIO_PIN_9; HAL_GPIO_Init(GPIOD, &UG);
+	}
 }
 
 
