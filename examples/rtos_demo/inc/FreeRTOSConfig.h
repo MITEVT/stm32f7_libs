@@ -87,7 +87,7 @@
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION	1
 #define configUSE_QUEUE_SETS					1
 #define configUSE_IDLE_HOOK						0
-#define configUSE_TICK_HOOK						0
+#define configUSE_TICK_HOOK						1
 #define configCPU_CLOCK_HZ						( SystemCoreClock )
 #define configTICK_RATE_HZ						( 1000 )
 #define configMAX_PRIORITIES					( 5 )
@@ -173,7 +173,7 @@ standard names. */
 #define vPortSVCHandler SVC_Handler
 
 // Commented to enable use of HAL
-// #define xPortSysTickHandler SysTick_Handler
+#define xPortSysTickHandler SysTick_Handler
 
 /* Prevent the inclusion of items the assembler will not understand in assembly
 files. */
