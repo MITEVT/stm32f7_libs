@@ -52,7 +52,8 @@ AS_DEFS = -D__STARTUP_CLEAR_BSS
 
 # include directories (absolute or relative paths to additional folders with
 # headers, current folder is always included)
-INC_DIRS = inc $(CUBE_DIR)/cmsis_inc $(CUBE_DIR)/cmsis_dev_inc $(CUBE_DIR)/hal_inc $(CUBE_DIR)/FreeRTOS/Source/include $(CUBE_DIR)/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1 $(CUBE_DIR)/FreeRTOS-Plus-CLI
+INC_RTOS_DIRS = $(CUBE_DIR)/FreeRTOS/Source/include $(CUBE_DIR)/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1 $(CUBE_DIR)/FreeRTOS-Plus-CLI
+INC_DIRS = inc $(CUBE_DIR)/cmsis_inc $(CUBE_DIR)/cmsis_dev_inc $(CUBE_DIR)/hal_inc $(INC_RTOS_DIRS)
 
 # library directories (absolute or relative paths to additional folders with
 # libraries)
@@ -64,20 +65,22 @@ LIBS =
 
 # additional directories with source files (absolute or relative paths to
 # folders with source files, current folder is always included)
-SRCS_DIRS = src
+SRCS_DIRS = src $(CUBE_DIR)/hal_src
 
 # extension of C files
 C_EXT = c
 
-LL_SRCS = stm32f7xx_ll_gpio.c stm32f7xx_ll_rcc.c stm32f7xx_ll_utils.c stm32f7xx_ll_usart.c
+LL_SRCS = # stm32f7xx_ll_gpio.c stm32f7xx_ll_rcc.c stm32f7xx_ll_utils.c stm32f7xx_ll_usart.c stm32f7xx_ll_adc.c
 
 RTOS_SRCS = tasks.c queue.c list.c portable/GCC/ARM_CM7/r0p1/port.c portable/MemMang/heap_4.c
 
-RTOS_PLUS = $(CUBE_DIR)/FreeRTOS-Plus-CLI/FreeRTOS_CLI.c
+RTOS_PLUS_SRCS = $(CUBE_DIR)/FreeRTOS-Plus-CLI/FreeRTOS_CLI.c
 
 # wildcard for C source files (all files with C_EXT extension found in current
 # folder and SRCS_DIRS folders will be compiled and linked)
-C_SRCS = $(wildcard $(patsubst %, %/*.$(C_EXT), . $(SRCS_DIRS))) $(addprefix $(CUBE_DIR)/hal_src/, $(LL_SRCS)) $(addprefix $(CUBE_DIR)/FreeRTOS/Source/, $(RTOS_SRCS)) $(RTOS_PLUS)
+C_SRCS1 = $(wildcard $(patsubst %, %/*.$(C_EXT), . $(SRCS_DIRS))) $(addprefix $(CUBE_DIR)/hal_src/, $(LL_SRCS)) $(addprefix $(CUBE_DIR)/FreeRTOS/Source/, $(RTOS_SRCS)) $(RTOS_PLUS_SRCS)
+FILTER_OUT = $(foreach v,$(2),$(if $(findstring $(1),$(v)),,$(v)))
+C_SRCS = $(call FILTER_OUT,template, $(C_SRCS1))
 
 # extension of ASM files
 AS_EXT = s

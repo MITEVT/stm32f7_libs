@@ -1,90 +1,74 @@
-#include <stm32f7xx.h>
+#include <string.h>
 
-#include <stm32f7xx_ll_gpio.h>
-#include <stm32f7xx_ll_rcc.h>
-#include <stm32f7xx_ll_utils.h>
-#include <stm32f7xx_ll_bus.h>
-#include <stm32f7xx_hal_conf.h>
+#include "stm32f7xx.h"
+#include "stm32f7xx_hal.h"
 
+#define LD1_PIN GPIO_PIN_0
+#define LD2_PIN GPIO_PIN_7
+#define LD3_PIN GPIO_PIN_14
 
-
-volatile uint32_t ticks_ms;
 void SysTick_Handler(void) {
-	ticks_ms++;
+	HAL_IncTick();
+	HAL_SYSTICK_IRQHandler();
+}
+
+void HAL_UART_MspInit(UART_HandleTypeDef *husart) {
+	if (husart->Instance == USART3) {
+		__HAL_RCC_USART3_CLK_ENABLE();
+
+		__HAL_RCC_GPIOD_CLK_ENABLE();
+		GPIO_InitTypeDef UG;
+		UG.Mode = GPIO_MODE_AF_PP;
+		UG.Pull = GPIO_PULLUP;
+		UG.Speed = GPIO_SPEED_FREQ_HIGH;
+		UG.Alternate = GPIO_AF7_USART3;
+		UG.Pin = GPIO_PIN_8; HAL_GPIO_Init(GPIOD, &UG);
+		UG.Pin = GPIO_PIN_9; HAL_GPIO_Init(GPIOD, &UG);
+	}
 }
 
 
 int main(void) {
-
-	/* Enable PLL and set as SYSCLK (216MHz)
-	 * See User Manual Section 5.3.2
-	 *
-	 * f_in = 16Mhz
-	 * f_in / PLLM = 2Mhz -> PLLM = 8
-	 * f_vco = f_in * PLLN / PLLM = 432 Mhz -> PLLN = 216
-	 * f_out = f_vco / PLLP = 216 Mhz -> PLLP = 2
-	 * f_out2 = f_vco / PLLQ = 48 Mhz -> PLLQ = 9
-	 *
-	 * APB1 Prescaler = f_out / 54 Mhz = 4
-	 * APB2 Prescaler = f_out / 108 Mhz = 2
-	 */
-
-
-	LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA 
-								| LL_AHB1_GRP1_PERIPH_GPIOB 
-								| LL_AHB1_GRP1_PERIPH_GPIOC
-								| LL_AHB1_GRP1_PERIPH_GPIOD);
-
-	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_USART3);
-
-
-	// Initialize SysTick
-	ticks_ms = 0;
-	SystemCoreClockUpdate();
-	SysTick_Config(SystemCoreClock/1000);
 	
+	HAL_Init();
 
-	GPIO_InitTypeDef DP8;
-	DP8.Pin = GPIO_PIN_8;
-	DP8.Mode = GPIO_MODE_AF_PP;
-	DP8.Pull = GPIO_NOPULL;
-	DP8.Speed = GPIO_SPEED_FREQ_HIGH;
-	DP8.Alternate = GPIO_AF7_USART3;
+	__HAL_RCC_GPIOB_CLK_ENABLE();
+	GPIO_InitTypeDef LED;
+	LED.Mode = GPIO_MODE_OUTPUT_PP;
+	LED.Pull = GPIO_NOPULL;
+	LED.Speed = GPIO_SPEED_FREQ_LOW;
+	LED.Pin = LD1_PIN; HAL_GPIO_Init(GPIOB, &LED);
+	LED.Pin = LD2_PIN; HAL_GPIO_Init(GPIOB, &LED);
+	LED.Pin = LD3_PIN; HAL_GPIO_Init(GPIOB, &LED);
 
+	UART_HandleTypeDef usart3;
+	memset(&usart3, 0, sizeof(UART_HandleTypeDef)); // Prevents need to initialize unused things
+	usart3.Instance = USART3;
+	usart3.Init.BaudRate = UART_BAUD;
+	usart3.Init.WordLength = UART_WORDLENGTH_8B;
+	usart3.Init.StopBits = UART_STOPBITS_1;
+	usart3.Init.Parity = UART_PARITY_NONE;
+	usart3.Init.Mode = UART_MODE_TX_RX;
+	usart3.Init.OverSampling = USART_OVERSAMPLING_16;
+	if (HAL_UART_Init(&usart3) == HAL_ERROR) {
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
+	} else {
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
+	}
 
-	GPIO_InitTypeDef DP9;
-	DP9.Pin = GPIO_PIN_9;
-	DP9.Mode = GPIO_MODE_AF_PP;
-	DP9.Pull = GPIO_NOPULL;
-	DP9.Speed = GPIO_SPEED_FREQ_HIGH;
-	DP9.Alternate = GPIO_AF7_USART3;
-
-	HAL_GPIO_Init(GPIOD, &DP9);
-	HAL_GPIO_Init(GPIOD, &DP8);
-
-
-	UART_HandleTypeDef uart3;
-	uart3.Instance = USART3;
-	
-
-	uart3.Init.BaudRate = 9600;
-	uart3.Init.WordLength = UART_WORDLENGTH_8B;
-	uart3.Init.StopBits = UART_STOPBITS_1;
-	uart3.Init.Parity = UART_PARITY_NONE;
-	uart3.Init.Mode = UART_MODE_TX_RX;
-	uart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-	uart3.Init.OverSampling = UART_OVERSAMPLING_16;
-	uart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-
-
-	HAL_UART_Init(&uart3);
-
-	uint32_t last_ms = ticks_ms;
+	uint32_t last_ms = HAL_GetTick();
 	while (1) {
-		if (ticks_ms - last_ms > 500) {
-			uint8_t data[4] = {0xAA, 0xAA, 0xAA, 0xAA};
-			HAL_UART_Transmit(&uart3, data, 4,100);
+		uint8_t c;
+		if (HAL_UART_Receive(&usart3, &c, 1, 1) == HAL_OK) {
+			HAL_GPIO_TogglePin(GPIOB, LD2_PIN);
+			HAL_UART_Transmit(&usart3, &c, 1, 10);
 		}
+
+		if (HAL_GetTick() - last_ms > 1000) {
+			HAL_GPIO_TogglePin(GPIOB, LD1_PIN);
+			last_ms = HAL_GetTick();
+		}
+
 	}
 
 
