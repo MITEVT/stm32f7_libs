@@ -134,7 +134,7 @@ endif
 #=============================================================================#
 
 # core flags
-CORE_FLAGS = -mcpu=$(CORE) -mthumb
+CORE_FLAGS = -mcpu=$(CORE) -mthumb -mfpu=fpv5-sp-d16 -mfloat-abi=hard
 
 # flags for C compiler
 C_FLAGS = -std=$(C_STD) -g -ggdb3 -fverbose-asm -Wa,-ahlms=$(OUT_DIR_F)$(notdir $(<:.$(C_EXT)=.lst))

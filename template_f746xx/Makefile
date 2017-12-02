@@ -18,6 +18,7 @@ AS = $(TOOLCHAIN)gcc -x assembler-with-cpp
 OBJCOPY = $(TOOLCHAIN)objcopy
 OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
+GDB = $(TOOLCHAIN)gdb
 RM = rm -f
 
 OCD = openocd
@@ -100,12 +101,14 @@ C_STD = gnu99
 #=============================================================================#
 
 MOUNT = /Volumes/NODE_F746ZG/
+UART_BAUD = 115200
+UART_COM = $(word 1, $(wildcard /dev/tty.usbserial-*) $(wildcard /dev/tty.usbmodem*) $(wildcard /dev/ttyUSB*))
 
 #=============================================================================#
 # set the VPATH according to SRCS_DIRS and startup file directory
 #=============================================================================#
 
-VPATH = $(SRCS_DIRS) $(CUBE_DIR)/cmsis_dev_startup
+VPATH = $(SRCS_DIRS):$(CUBE_DIR)/cmsis_dev_startup
 
 #=============================================================================#
 # when using output folder, append trailing slash to its name
@@ -132,7 +135,7 @@ endif
 #=============================================================================#
 
 # core flags
-CORE_FLAGS = -mcpu=$(CORE) -mthumb
+CORE_FLAGS = -mcpu=$(CORE) -mthumb -mfpu=fpv5-sp-d16 -mfloat-abi=hard
 
 # flags for C compiler
 C_FLAGS = -std=$(C_STD) -g -ggdb3 -fverbose-asm -Wa,-ahlms=$(OUT_DIR_F)$(notdir $(<:.$(C_EXT)=.lst))
@@ -176,8 +179,10 @@ LSS = $(OUT_DIR_F)$(PROJECT).lss
 DMP = $(OUT_DIR_F)$(PROJECT).dmp
 DIS = $(OUT_DIR_F)$(PROJECT).dis
 
+C_DEFS_F = $(C_DEFS) -DUART_BAUD=$(UART_BAUD)
+
 # format final flags for tools, request dependancies for C and asm
-C_FLAGS_F = $(CORE_FLAGS) $(OPTIMIZATION) $(C_WARNINGS) $(C_FLAGS) $(C_DEFS) -MD -MP -MF $(OUT_DIR_F)$(@F:.o=.d) $(INC_DIRS_F)
+C_FLAGS_F = $(CORE_FLAGS) $(OPTIMIZATION) $(C_WARNINGS) $(C_FLAGS) $(C_DEFS_F) -MD -MP -MF $(OUT_DIR_F)$(@F:.o=.d) $(INC_DIRS_F)
 AS_FLAGS_F = $(CORE_FLAGS) $(AS_FLAGS) $(AS_DEFS) -MD -MP -MF $(OUT_DIR_F)$(@F:.o=.d) $(INC_DIRS_F)
 LD_FLAGS_F = $(CORE_FLAGS) $(LD_FLAGS) $(LIB_DIRS_F)
 
@@ -300,9 +305,26 @@ copy: all
 
 program: all
 	@echo "Programming" $(ELF) "with OCD"
-	# A little fun time magic
 	@if test ! -d $(OCD_DIR); then OCD_DIR=/usr/share/openocd/scripts; fi
 	@$(OCD) -s $(OCD_DIR) $(OCD_FLAGS) -c "program $(ELF) verify reset exit"
+
+#-----------------------------------------------------------------------------#
+# Open up serial port
+#-----------------------------------------------------------------------------#
+
+com:
+	@echo "Starting terminal with baud" $(UART_BAUD)
+	@picocom -b $(UART_BAUD) $(UART_COM)
+
+#-----------------------------------------------------------------------------#
+# Debug
+#-----------------------------------------------------------------------------#
+
+debug_start:
+	$(OCD) -s $(OCD_DIR) $(OCD_FLAGS) -c "init" -c "reset halt" -c 'sleep 10'
+
+debug:
+	$(GDB) -x ./stm_nucleo.gdbinit
 
 #=============================================================================#
 # make clean
@@ -324,9 +346,12 @@ endif
 # global exports
 #=============================================================================#
 
-.PHONY: all clean dependents
+.PHONY: all clean dependents diff
 
 .SECONDARY:
+
+# [TODO] figure out .SUFFIXES
+
 
 # include dependancy files
 -include $(DEPS)
