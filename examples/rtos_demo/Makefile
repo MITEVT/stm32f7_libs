@@ -18,6 +18,7 @@ AS = $(TOOLCHAIN)gcc -x assembler-with-cpp
 OBJCOPY = $(TOOLCHAIN)objcopy
 OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
+GDB = $(TOOLCHAIN)gdb
 RM = rm -f
 
 OCD_DIR = /usr/local/share/openocd/scripts
@@ -322,6 +323,18 @@ program: all
 com:
 	@echo "Starting terminal with baud" $(UART_BAUD)
 	@picocom -b $(UART_BAUD) $(UART_COM)
+
+#-----------------------------------------------------------------------------#
+# Debug
+#-----------------------------------------------------------------------------#
+
+debug_start:
+	$(OCD) -s $(OCD_DIR) $(OCD_FLAGS) -c "init" -c "reset halt" -c 'sleep 10'
+
+debug:
+	$(GDB) -x ./$(PROJECT).gdbinit
+
+
 
 #=============================================================================#
 # make clean
