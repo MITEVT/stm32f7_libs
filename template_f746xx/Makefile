@@ -207,7 +207,6 @@ $(ELF) : $(LD_SCRIPT)
 
 $(ELF) : $(OBJS)
 	@echo 'Linking target: $(ELF)'
-	@echo $(AS_SRCS_F)
 	$(CC) $(LD_FLAGS_F) $(OBJS) $(LIBS) -o $@
 	@echo ' '
 
@@ -346,7 +345,7 @@ endif
 # global exports
 #=============================================================================#
 
-.PHONY: all clean dependents diff
+.PHONY: all clean dependents
 
 .SECONDARY:
 
