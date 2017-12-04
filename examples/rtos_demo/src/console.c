@@ -90,6 +90,23 @@ void vCommandConsoleTask( void *pvParameters )
     parameter.  Cast the task parameter to the correct type. */
     xConsole = (UART_HandleTypeDef*) pvParameters;
 
+#ifdef CONSOLE_START_COMMAND
+    /* Wait for startup code to be send from serial terminal */
+    uint8_t start_len = strlen(CONSOLE_START_COMMAND);
+
+    int i;
+    for (i = 0; i < start_len; i++) {
+        while(HAL_UART_Receive(xConsole, &cRxedChar, 1, 1) != HAL_OK) {
+            vTaskDelay(1 / portTICK_PERIOD_MS);
+        }
+
+        /* If rxed char is not correct, start over */
+        if (cRxedChar != *(CONSOLE_START_COMMAND+i)) {
+            i = 0;
+        }
+    }
+#endif
+
     /* Send a welcome message to the user knows they are connected. */
     HAL_UART_Transmit(xConsole, (uint8_t*)pcWelcomeMessage, strlen(pcWelcomeMessage), CALC_UART_TIMEOUT(strlen(pcWelcomeMessage)));
 
@@ -186,7 +203,7 @@ prototype. */
 static BaseType_t prvToggleLEDCommand(char *pcWriteBuffer,
                                      size_t xWriteBufferLen,
                                      const char *pcCommandString) {
-	char *pcParameter1;
+    const char *pcParameter1;
 	BaseType_t xParameter1StringLength, xResult;
 
     /* Obtain the name of the led, and the length of its name, from
@@ -199,16 +216,26 @@ static BaseType_t prvToggleLEDCommand(char *pcWriteBuffer,
                           /* Store the parameter string length. */
                           &xParameter1StringLength
                         );
+    
+    xResult = pdFAIL;
+    if(pcParameter1 != NULL) {
 
-    /* Terminate the parameter. */
-    pcParameter1[xParameter1StringLength] = 0x00;
+        /* Don't screw with const */
+        char *tmp = (char *)pvPortMalloc(xParameter1StringLength + 1);
+        memcpy(tmp, pcParameter1, xParameter1StringLength * sizeof(char));
+        
+        /* Terminate the parameter. */
+        tmp[xParameter1StringLength] = 0x00;
 
-    /* Perform the toggle operation itself. */
-    xResult = pdPASS;
-    if (strlen(pcParameter1) > 1) xResult = pdFAIL;
-    else if (pcParameter1[0] == '2') mainTOGGLE_LED2();
-    else if (pcParameter1[0] == '3') mainTOGGLE_LED3();
-    else xResult = pdFAIL;
+        /* Perform the toggle operation itself. */
+        xResult = pdPASS;
+        if (xParameter1StringLength > 1) xResult = pdFAIL;
+        else if (tmp[0] == '2') mainTOGGLE_LED2();
+        else if (tmp[0] == '3') mainTOGGLE_LED3();
+        else xResult = pdFAIL;
+
+        vPortFree(tmp);
+    }
 
     if(xResult != pdPASS)
     {
@@ -265,7 +292,6 @@ static const char* const pcRandomHardwareErrorMessage =
 static const char* const pcRandomEndMessage = 
     "\r\n";
 
-static uint8_t puRandomFlag = 0;
 static uint8_t puRandomNumLeft = 0;
 
 /* This function implements the behavior of a command, so must have the correct

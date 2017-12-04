@@ -24,6 +24,8 @@ RM = rm -f
 OCD_DIR = /usr/local/share/openocd/scripts
 OCD = openocd
 
+PYTHON = python3
+
 #=============================================================================#
 # project configuration
 #=============================================================================#
@@ -109,6 +111,9 @@ C_STD = c99
 MOUNT = /Volumes/NODE_F746ZG/
 UART_BAUD = 115200
 UART_COM = $(word 1, $(wildcard /dev/tty.usbserial-*) $(wildcard /dev/tty.usbmodem*) $(wildcard /dev/ttyUSB*))
+UART_COM = /dev/ttys001
+# Command to send on start of terminal for starting console
+START_COMMAND = abcdef
 
 #=============================================================================#
 # set the VPATH according to SRCS_DIRS and startup file directory
@@ -185,7 +190,7 @@ LSS = $(OUT_DIR_F)$(PROJECT).lss
 DMP = $(OUT_DIR_F)$(PROJECT).dmp
 DIS = $(OUT_DIR_F)$(PROJECT).dis
 
-C_DEFS_F = $(C_DEFS) -DUART_BAUD=$(UART_BAUD)
+C_DEFS_F = $(C_DEFS) -DUART_BAUD=$(UART_BAUD) -DCONSOLE_START_COMMAND=\"$(START_COMMAND)\"
 
 # format final flags for tools, request dependancies for C and asm
 C_FLAGS_F = $(CORE_FLAGS) $(OPTIMIZATION) $(C_WARNINGS) $(C_FLAGS) $(C_DEFS_F) -MD -MP -MF $(OUT_DIR_F)$(@F:.o=.d) $(INC_DIRS_F)
@@ -319,7 +324,8 @@ program: all
 
 com:
 	@echo "Starting terminal with baud" $(UART_BAUD)
-	@picocom -b $(UART_BAUD) $(UART_COM)
+	# @picocom -b $(UART_BAUD) $(UART_COM)
+	@$(PYTHON) scripts/miniterm-stm-rtos.py --startcmd $(START_COMMAND) $(UART_COM) $(UART_BAUD)
 
 #-----------------------------------------------------------------------------#
 # Debug
