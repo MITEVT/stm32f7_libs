@@ -54,6 +54,12 @@ static RNG_HandleTypeDef rng;
 
 /*-----------------------------------------------------------*/
 
+
+// [TODO] Change init.c to have every task init it's own hardware
+// [TODO] Change delay time for unstarted console
+// [TODO] Change console to reset on special character also
+// [TODO] Change to core makefile/specific makefile architecture
+	// to prevent propagating changes throughout every example
 int main(void) {
 	/* Configure the hardware ready to run the demo. */
 	vSetupHardware(&usart3, &rng);

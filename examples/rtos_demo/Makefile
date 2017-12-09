@@ -105,15 +105,30 @@ C_WARNINGS = -Wall -Wstrict-prototypes -Wextra -fdiagnostics-color=always
 C_STD = c99
 
 #=============================================================================#
-# Write Configuration
+# write configuration
 #=============================================================================#
 
+# name of volume that nucleo mounts as
 MOUNT = /Volumes/NODE_F746ZG/
+
+# desired baud rate when opening terminal
+# also passed to preprocessor as UART_BAUD
 UART_BAUD = 115200
+
+# Communication port for serial device
+# currently searches through a list of possible names
 UART_COM = $(word 1, $(wildcard /dev/tty.usbserial-*) $(wildcard /dev/tty.usbmodem*) $(wildcard /dev/ttyUSB*))
-UART_COM = /dev/ttys001
+
 # Command to send on start of terminal for starting console
 START_COMMAND = abcdef
+
+#=============================================================================#
+# make debug options
+#=============================================================================#
+
+# virtual com port if debugging console
+# see scripts/test_ports.sh for command
+# UART_COM = /dev/ttys001
 
 #=============================================================================#
 # set the VPATH according to SRCS_DIRS and startup file directory
@@ -302,7 +317,7 @@ make_output_dir :
 	$(shell mkdir $(OUT_DIR_F) 2>/dev/null)
 
 #-----------------------------------------------------------------------------#
-# Write to flash of chip by copying to enumerated mass storage device
+# write to flash of chip by copying to enumerated mass storage device
 #-----------------------------------------------------------------------------#
 
 copy: all
@@ -310,7 +325,7 @@ copy: all
 	@cp $(BIN) $(MOUNT)
 
 #-----------------------------------------------------------------------------#
-# Write to flash of chip with ocd
+# write to flash of chip with ocd
 #-----------------------------------------------------------------------------#
 
 program: all
@@ -319,7 +334,7 @@ program: all
 
 
 #-----------------------------------------------------------------------------#
-# Open up serial port
+# open up serial port
 #-----------------------------------------------------------------------------#
 
 com:
@@ -328,7 +343,7 @@ com:
 	@$(PYTHON) scripts/miniterm-stm-rtos.py --startcmd $(START_COMMAND) $(UART_COM) $(UART_BAUD)
 
 #-----------------------------------------------------------------------------#
-# Debug
+# debug
 #-----------------------------------------------------------------------------#
 
 debug_start:

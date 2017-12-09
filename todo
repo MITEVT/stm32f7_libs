@@ -1,0 +1,4 @@
+Features to implement
+
+- Create "core" makefile for the entire directory and then have a project specific makefile for configurable things
+

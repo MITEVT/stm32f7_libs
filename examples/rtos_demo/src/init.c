@@ -33,7 +33,7 @@ void vSetupHardware(UART_HandleTypeDef *xConsole, RNG_HandleTypeDef *xRNG) {
 	xConsole->Init.StopBits = UART_STOPBITS_1;
 	xConsole->Init.Parity = UART_PARITY_NONE;
 	xConsole->Init.Mode = UART_MODE_TX_RX;
-	xConsole->Init.OverSampling = USART_OVERSAMPLING_16;
+	xConsole->Init.OverSampling = UART_OVERSAMPLING_16;
 	HAL_UART_Init(xConsole);
 
 	xRNG->Instance = RNG;
