@@ -1,6 +1,6 @@
-update=Saturday, September 16, 2017 'PMt' 02:29:47 PM
+update=Saturday, February 10, 2018 'PMt' 04:36:01 PM
 version=1
-last_client=kicad
+last_client=eeschema
 [pcbnew]
 version=1
 LastNetListRead=
@@ -66,3 +66,4 @@ LibName34=MITEVT_OPTO
 LibName35=MITEVT_power
 LibName36=MITEVT_REG
 LibName37=MITEVT_relay
+LibName38=MITEVT_SWITCH
