@@ -559,6 +559,7 @@ static const char* const pcSampleADCErrorMessage =
 
 static const char* const pcSampleADCTimeoutMessage =
 	"ADC Timeout\r\n";
+
 static BaseType_t prvSampleADC(char *pcWriteBuffer,
 									size_t xWriteBufferLen,
 									const char *pcCommandString) {
@@ -566,7 +567,7 @@ static BaseType_t prvSampleADC(char *pcWriteBuffer,
 	(void)xWriteBufferLen;
 	(void)pcCommandString;
 
-	char str[7];
+	char str[4];
 
 	HAL_ADC_Start(&adc1);
 	HAL_StatusTypeDef status = HAL_ADC_PollForConversion(&adc1, ADC_TIMEOUT);
@@ -582,18 +583,6 @@ static BaseType_t prvSampleADC(char *pcWriteBuffer,
 
 	return pdFALSE;
 }
-
-// static BaseType_t prvInitADCCommand(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
-
-// 	(void*)pcWriteBuffer;
-// 	(void*)xWriteBufferLen;
-// 	(void*)pcCommandString;
-// 	// LL_ADC_InitTypeDef adc3_init = {LL_ADC_RESOLUTION_8B, LL_ADC_DATA_ALIGN_RIGHT, LL_ADC_SEQ_SCAN_DISABLE};
-// 	// LL_ADC_CommonInitTypeDef adc3_common = {LL_ADC_CLOCK_SYNC_PCLK_DIV2, LL_ADC_MULTI_INDEPENDENT, }
-// 	// LL_ADC_Init(ADC3, &adc3_init);
-// 	// LL_ADC_Enable(ADC3);
-
-// }
 
 /*-----------------------------------------------------------*/
 /* HAL Init Functions*/
