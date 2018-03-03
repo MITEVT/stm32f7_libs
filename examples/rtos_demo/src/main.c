@@ -361,8 +361,6 @@ void vCommandConsoleTask( void *pvParameters )
     /* Send a welcome message to the user knows they are connected. */
     HAL_UART_Transmit(xConsole, (uint8_t*)pcWelcomeMessage, strlen(pcWelcomeMessage), CALC_UART_TIMEOUT(strlen(pcWelcomeMessage)));
 
-    uint8_t nl_flag = 0;
-
     for( ;; )
     {
         /* This implementation reads a single character at a time. Yield if no character available */
@@ -370,8 +368,7 @@ void vCommandConsoleTask( void *pvParameters )
  			vTaskDelay(1 / portTICK_PERIOD_MS);
  		}
 
-        if((cRxedChar == '\n' || cRxedChar == '\r') && nl_flag == 0) {
-        	nl_flag = 1; // Last character received was a new line 
+        if (cRxedChar == '\n' || cRxedChar == '\r') {
 
             /* A newline character was received, so the input command string is
             complete and can be processed.  Transmit a line separator, just to
@@ -424,7 +421,6 @@ void vCommandConsoleTask( void *pvParameters )
                     pcInputString[ cInputIndex ] = '\0';
     				HAL_UART_Transmit(&usart3, (uint8_t*)pcBackSpace, strlen(pcBackSpace), CALC_UART_TIMEOUT(strlen(pcBackSpace)));
                 }
-                nl_flag = 0;
             } else {
                 /* A character was entered.  It was not a new line, backspace
                 or carriage return, so it is accepted as part of the input and
@@ -435,7 +431,6 @@ void vCommandConsoleTask( void *pvParameters )
                     cInputIndex++;
     				HAL_UART_Transmit(&usart3, &cRxedChar, 1, CALC_UART_TIMEOUT(1));
                 }
-                nl_flag = 0;
             }
         }
     }
