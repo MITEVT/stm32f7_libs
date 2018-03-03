@@ -49,6 +49,8 @@ static void prvSetupHardware(void);
 #define LD2_PIN GPIO_PIN_7
 #define LD3_PIN GPIO_PIN_14
 
+#define ADC_TIMEOUT 1
+
 /*
  * Configure the system clock for maximum speed.
  */
@@ -71,12 +73,16 @@ static QueueHandle_t xQueue = NULL;
 /* Console UART Handler Type */
 static UART_HandleTypeDef usart3;
 
+/* ADC command handle */
+static ADC_HandleTypeDef adc1;
+
 /*-----------------------------------------------------------*/
 /* Command Line Definitions */
 
 void vCommandConsoleTask(void *pvParameters);
 static BaseType_t prvToggleLEDCommand(char*, size_t, const char*);
 static BaseType_t prvFreqCommand(char*, size_t, const char*);
+static BaseType_t prvSampleADC(char*, size_t, const char*);
 
 static const CLI_Command_Definition_t xToggleLEDCommand = {
     "toggle-led",
@@ -92,6 +98,13 @@ static const CLI_Command_Definition_t xFreqCommand = {
     0
 };
 
+static const CLI_Command_Definition_t xSampleADCCommand = {
+	"adc",
+	"adc: Sample from A0\r\n",
+	prvSampleADC,
+	0
+};
+
 /*-----------------------------------------------------------*/
 
 int main(void) {
@@ -100,6 +113,7 @@ int main(void) {
 
 	FreeRTOS_CLIRegisterCommand(&xToggleLEDCommand);
 	FreeRTOS_CLIRegisterCommand(&xFreqCommand);
+	FreeRTOS_CLIRegisterCommand(&xSampleADCCommand);
 	xTaskCreate(vCommandConsoleTask, "console", configMINIMAL_STACK_SIZE*4, &usart3, mainCOMMAND_CONSOLE_TASK_PRIORITY, NULL);
 
 	/* Create the queue. */
@@ -210,6 +224,23 @@ static void prvSetupHardware(void) {
 	usart3.Init.Mode = UART_MODE_TX_RX;
 	usart3.Init.OverSampling = USART_OVERSAMPLING_16;
 	HAL_UART_Init(&usart3);
+
+	memset(&adc1, 0, sizeof(ADC_HandleTypeDef));
+	adc1.Instance = ADC1;
+	adc1.Init.ClockPrescaler = 1;
+	adc1.Init.Resolution = ADC_RESOLUTION_8B;
+	adc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+	adc1.Init.ScanConvMode = DISABLE;
+	adc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+	adc1.Init.ContinuousConvMode = DISABLE;
+
+	ADC_ChannelConfTypeDef sConfig;
+	sConfig.Channel = ADC_CHANNEL_3;
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+
+	HAL_ADC_Init(&adc1);
+	HAL_ADC_ConfigChannel(&adc1, &sConfig);
 
 }
 
@@ -445,8 +476,8 @@ static const char* const pcToggleLEDErrorMessage =
 /* This function implements the behavior of a command, so must have the correct
 prototype. */
 static BaseType_t prvToggleLEDCommand(char *pcWriteBuffer,
-                                     size_t xWriteBufferLen,
-                                     const char *pcCommandString) {
+                                    size_t xWriteBufferLen,
+                                    const char *pcCommandString) {
 	const char *pcParameter1;
 	BaseType_t xParameter1StringLength, xResult;
 
@@ -498,8 +529,8 @@ static const char* const pcFreqEndMessage =
 /* This function implements the behavior of a command, so must have the correct
 prototype. */
 static BaseType_t prvFreqCommand(char *pcWriteBuffer,
-                                     size_t xWriteBufferLen,
-                                     const char *pcCommandString) {
+                                    size_t xWriteBufferLen,
+                                    const char *pcCommandString) {
 
 	(void)xWriteBufferLen;
 	(void)pcCommandString;
@@ -516,6 +547,40 @@ static BaseType_t prvFreqCommand(char *pcWriteBuffer,
     /* There is only a single line of output produced in all cases.  pdFALSE is
     returned because there is no more output to be generated. */
     return pdFALSE;
+}
+
+/*-----------------------------------------------------------*/
+
+static const char* const pcSampleADCEndMessage = 
+	"\r\n";
+
+static const char* const pcSampleADCErrorMessage =
+	"Error During Sample\r\n";
+
+static const char* const pcSampleADCTimeoutMessage =
+	"ADC Timeout\r\n";
+static BaseType_t prvSampleADC(char *pcWriteBuffer,
+									size_t xWriteBufferLen,
+									const char *pcCommandString) {
+
+	(void)xWriteBufferLen;
+	(void)pcCommandString;
+
+	char str[7];
+
+	HAL_ADC_Start(&adc1);
+	HAL_StatusTypeDef status = HAL_ADC_PollForConversion(&adc1, ADC_TIMEOUT);
+	if (status == HAL_ERROR) {
+		memcpy(pcWriteBuffer, pcSampleADCErrorMessage, strlen(pcSampleADCErrorMessage));
+	} else if (status == HAL_TIMEOUT) {
+		memcpy(pcWriteBuffer, pcSampleADCTimeoutMessage, strlen(pcSampleADCTimeoutMessage));
+	} else {
+		itoa(HAL_ADC_GetValue(&adc1), str, 10);
+		memcpy(pcWriteBuffer, str, strlen(str));
+		memcpy(pcWriteBuffer+strlen(str), pcSampleADCEndMessage, strlen(pcSampleADCEndMessage));
+	}
+
+	return pdFALSE;
 }
 
 // static BaseType_t prvInitADCCommand(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
@@ -546,6 +611,21 @@ void HAL_UART_MspInit(UART_HandleTypeDef *husart) {
 		UG.Pin = GPIO_PIN_8; HAL_GPIO_Init(GPIOD, &UG);
 		UG.Pin = GPIO_PIN_9; HAL_GPIO_Init(GPIOD, &UG);
 	}
+}
+
+// ADC is fed by APB2 currently set to 108 Mhz
+void HAL_ADC_MspInit(ADC_HandleTypeDef *hadc) {
+	if (hadc->Instance == ADC1) {
+		__HAL_RCC_ADC1_CLK_ENABLE();
+
+		__HAL_RCC_GPIOA_CLK_ENABLE();
+		GPIO_InitTypeDef UG;
+		UG.Mode = GPIO_MODE_ANALOG;
+		UG.Pull = GPIO_NOPULL;
+		UG.Pin = GPIO_PIN_3;
+		HAL_GPIO_Init(GPIOA, &UG);
+	}
+
 }
 
 
