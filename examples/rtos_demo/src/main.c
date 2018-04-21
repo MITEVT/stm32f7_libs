@@ -15,6 +15,9 @@
 #include "FreeRTOS_CLI.h"
 // #include "port.c"
 
+/* Project include files */
+#include "board.h"
+
 // void SysTick_Handler(void) {
 // 	xPortSysTickHandler();
 // }
@@ -32,11 +35,6 @@ to ticks using the portTICK_PERIOD_MS constant. */
 will remove items as they are added, meaning the send task should always find
 the queue empty. */
 #define mainQUEUE_LENGTH					(1)
-
-/* The LED is used to show the demo status. (not connected on Rev A hardware) */
-#define mainTOGGLE_LED1()	HAL_GPIO_TogglePin(GPIOB, LD1_PIN)
-#define mainTOGGLE_LED2()	HAL_GPIO_TogglePin(GPIOB, LD2_PIN)
-#define mainTOGGLE_LED3()	HAL_GPIO_TogglePin(GPIOB, LD3_PIN)
 
 /*-----------------------------------------------------------*/
 
@@ -83,6 +81,7 @@ void vCommandConsoleTask(void *pvParameters);
 static BaseType_t prvToggleLEDCommand(char*, size_t, const char*);
 static BaseType_t prvFreqCommand(char*, size_t, const char*);
 static BaseType_t prvSampleADC(char*, size_t, const char*);
+static BaseType_t prvSystemReset(char*, size_t, const char*);
 
 static const CLI_Command_Definition_t xToggleLEDCommand = {
     "toggle-led",
@@ -105,6 +104,13 @@ static const CLI_Command_Definition_t xSampleADCCommand = {
 	0
 };
 
+static const CLI_Command_Definition_t xSystemReset = {
+	"reset",
+	"reset: Perform a software reset\r\n",
+	prvSystemReset,
+	0
+};
+
 /*-----------------------------------------------------------*/
 
 int main(void) {
@@ -114,6 +120,7 @@ int main(void) {
 	FreeRTOS_CLIRegisterCommand(&xToggleLEDCommand);
 	FreeRTOS_CLIRegisterCommand(&xFreqCommand);
 	FreeRTOS_CLIRegisterCommand(&xSampleADCCommand);
+	FreeRTOS_CLIRegisterCommand(&xSystemReset);
 	xTaskCreate(vCommandConsoleTask, "console", configMINIMAL_STACK_SIZE*4, &usart3, mainCOMMAND_CONSOLE_TASK_PRIORITY, NULL);
 
 	/* Create the queue. */
@@ -190,7 +197,7 @@ static void prvQueueReceiveTask(void *pvParameters) {
 		is it the expected value?  If it is, toggle the LED. */
 		if( ulReceivedValue == ulExpectedValue )
 		{
-			mainTOGGLE_LED1();
+			boardTOGGLE_LED1();
 			ulReceivedValue = 0U;
 		}
 	}
@@ -498,8 +505,8 @@ static BaseType_t prvToggleLEDCommand(char *pcWriteBuffer,
 
     /* Perform the toggle operation itself. */
     xResult = pdPASS;
-    if (pcParameter1[0] == '2') mainTOGGLE_LED2();
-    else if (pcParameter1[0] == '3') mainTOGGLE_LED3();
+    if (pcParameter1[0] == '2') boardTOGGLE_LED2();
+    else if (pcParameter1[0] == '3') boardTOGGLE_LED3();
     else xResult = pdFAIL;
 
     if( xResult != pdPASS )
@@ -580,6 +587,21 @@ static BaseType_t prvSampleADC(char *pcWriteBuffer,
 		memcpy(pcWriteBuffer, str, strlen(str));
 		memcpy(pcWriteBuffer+strlen(str), pcSampleADCEndMessage, strlen(pcSampleADCEndMessage));
 	}
+
+	return pdFALSE;
+}
+
+/*-----------------------------------------------------------*/
+
+static BaseType_t prvSystemReset(char *pcWriteBuffer,
+									size_t xWriteBufferLen,
+									const char *pcCommandString) {
+
+	(void)pcWriteBuffer;
+	(void)xWriteBufferLen;
+	(void)pcCommandString;
+
+	NVIC_SystemReset();
 
 	return pdFALSE;
 }
