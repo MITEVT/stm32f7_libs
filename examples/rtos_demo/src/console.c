@@ -18,6 +18,9 @@
 static BaseType_t prvToggleLEDCommand(char*, size_t, const char*);
 static BaseType_t prvFreqCommand(char*, size_t, const char*);
 static BaseType_t prvRandomCommand(char*, size_t, const char*);
+static BaseType_t prvSampleADC(char*, size_t, const char*);
+static BaseType_t prvSystemReset(char*, size_t, const char*);
+static BaseType_t prvDMATest(char*, size_t, const char*);
 
 static const CLI_Command_Definition_t xToggleLEDCommand = {
     "toggle-led",
@@ -40,7 +43,30 @@ static const CLI_Command_Definition_t xRandomCommand = {
     1
 };
 
+static const CLI_Command_Definition_t xSampleADCCommand = {
+    "adc",
+    "adc: Sample from A0\r\n",
+    prvSampleADC,
+    0
+};
+
+static const CLI_Command_Definition_t xSystemReset = {
+    "reset",
+    "reset: Perform a software reset\r\n",
+    prvSystemReset,
+    0
+};
+
+static const CLI_Command_Definition_t xDMATest = {
+    "dma-test",
+    "dma-test: Perform a memory-memory dma test",
+    prvDMATest,
+    0
+};
+
 static RNG_HandleTypeDef *xRNG;
+static ADC_HandleTypeDef *xADC;
+static DMA_HandleTypeDef *xDMA;
 
 /*-----------------------------------------------------------*/
 /* utility function prototypes */
@@ -48,16 +74,29 @@ static RNG_HandleTypeDef *xRNG;
 static int32_t atoi(char *s);
 static char* itoa(int value, char* buffer, int base);
 
+/*-----------------------------------------------------------*/
+/* private variables */
+
+#define ADC_TIMEOUT 1
+
+#define DMA_TEST_SIZE 64
+static volatile uint32_t dma_dest[DMA_TEST_SIZE];
+
 
 /*-----------------------------------------------------------*/
 /* console initialization function */
 
-void vConsoleInit(RNG_HandleTypeDef *rng) {
+void vConsoleInit(RNG_HandleTypeDef *rng, ADC_HandleTypeDef *adc, DMA_HandleTypeDef *dma) {
     FreeRTOS_CLIRegisterCommand(&xToggleLEDCommand);
     FreeRTOS_CLIRegisterCommand(&xFreqCommand);
     FreeRTOS_CLIRegisterCommand(&xRandomCommand);
+    FreeRTOS_CLIRegisterCommand(&xSampleADCCommand);
+    FreeRTOS_CLIRegisterCommand(&xSystemReset);
+    FreeRTOS_CLIRegisterCommand(&xDMATest);
 
     xRNG = rng;
+    xADC = adc;
+    xDMA = dma;
 }
 
 /*-----------------------------------------------------------*/
@@ -186,7 +225,7 @@ prototype. */
 static BaseType_t prvToggleLEDCommand(char *pcWriteBuffer,
                                      size_t xWriteBufferLen,
                                      const char *pcCommandString) {
-	char *pcParameter1;
+	char* pcParameter1;
 	BaseType_t xParameter1StringLength, xResult;
 
     /* Obtain the name of the led, and the length of its name, from
@@ -206,8 +245,8 @@ static BaseType_t prvToggleLEDCommand(char *pcWriteBuffer,
     /* Perform the toggle operation itself. */
     xResult = pdPASS;
     if (strlen(pcParameter1) > 1) xResult = pdFAIL;
-    else if (pcParameter1[0] == '2') mainTOGGLE_LED2();
-    else if (pcParameter1[0] == '3') mainTOGGLE_LED3();
+    else if (pcParameter1[0] == '2') boardTOGGLE_LED2();
+    else if (pcParameter1[0] == '3') boardTOGGLE_LED3();
     else xResult = pdFAIL;
 
     if(xResult != pdPASS)
@@ -265,7 +304,6 @@ static const char* const pcRandomHardwareErrorMessage =
 static const char* const pcRandomEndMessage = 
     "\r\n";
 
-static uint8_t puRandomFlag = 0;
 static uint8_t puRandomNumLeft = 0;
 
 /* This function implements the behavior of a command, so must have the correct
@@ -343,20 +381,104 @@ static BaseType_t prvRandomCommand(char *pcWriteBuffer,
 }
 
 /*-----------------------------------------------------------*/
-/* Init ADC command callback */
-/* [TODO] */
 
-// static BaseType_t prvInitADCCommand(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString) {
+static const char* const pcSampleADCEndMessage = 
+    "\r\n";
 
-// 	(void*)pcWriteBuffer;
-// 	(void*)xWriteBufferLen;
-// 	(void*)pcCommandString;
-// 	// LL_ADC_InitTypeDef adc3_init = {LL_ADC_RESOLUTION_8B, LL_ADC_DATA_ALIGN_RIGHT, LL_ADC_SEQ_SCAN_DISABLE};
-// 	// LL_ADC_CommonInitTypeDef adc3_common = {LL_ADC_CLOCK_SYNC_PCLK_DIV2, LL_ADC_MULTI_INDEPENDENT, }
-// 	// LL_ADC_Init(ADC3, &adc3_init);
-// 	// LL_ADC_Enable(ADC3);
+static const char* const pcSampleADCErrorMessage =
+    "Error During Sample\r\n";
 
-// }
+static const char* const pcSampleADCTimeoutMessage =
+    "ADC Timeout\r\n";
+
+static BaseType_t prvSampleADC(char *pcWriteBuffer,
+                                    size_t xWriteBufferLen,
+                                    const char *pcCommandString) {
+
+    (void)xWriteBufferLen;
+    (void)pcCommandString;
+
+    char str[4];
+
+    HAL_ADC_Start(xADC);
+    HAL_StatusTypeDef status = HAL_ADC_PollForConversion(xADC, ADC_TIMEOUT);
+    if (status == HAL_ERROR) {
+        memcpy(pcWriteBuffer, pcSampleADCErrorMessage, strlen(pcSampleADCErrorMessage));
+    } else if (status == HAL_TIMEOUT) {
+        memcpy(pcWriteBuffer, pcSampleADCTimeoutMessage, strlen(pcSampleADCTimeoutMessage));
+    } else {
+        itoa(HAL_ADC_GetValue(xADC), str, 10);
+        memcpy(pcWriteBuffer, str, strlen(str));
+        memcpy(pcWriteBuffer+strlen(str), pcSampleADCEndMessage, strlen(pcSampleADCEndMessage));
+    }
+
+    return pdFALSE;
+}
+
+/*-----------------------------------------------------------*/
+
+static BaseType_t prvSystemReset(char *pcWriteBuffer,
+                                    size_t xWriteBufferLen,
+                                    const char *pcCommandString) {
+
+    (void)pcWriteBuffer;
+    (void)xWriteBufferLen;
+    (void)pcCommandString;
+
+    NVIC_SystemReset();
+
+    return pdFALSE;
+}
+
+/*-----------------------------------------------------------*/
+
+static const char* const pcDMATestErrorMessage =
+    ": Error During DMA\r\n";
+
+static const char* const pcDMATestTimeoutMessage =
+    "DMA Timeout\r\n";
+
+static const char* const pcDMATestPassMessage = 
+    "DMA Passed\r\n";
+
+static const char* const pcDMATestFailMessage =
+    "DMA Failed\r\n";
+
+static const uint32_t pcDMATestString[6] = 
+    {12, 36, 42, 33, 445, 543};
+
+// Todo don't wait forever, just check and if not ready then return pdTrue!
+static BaseType_t prvDMATest(char *pcWriteBuffer,
+                                    size_t xWriteBufferLen,
+                                    const char *pcCommandString) {
+
+    (void)xWriteBufferLen;
+    (void)pcCommandString;
+
+    int i;
+
+    HAL_DMA_Start(xDMA, pcDMATestString, dma_dest, 6);
+    HAL_StatusTypeDef status = HAL_DMA_PollForTransfer(xDMA, HAL_DMA_FULL_TRANSFER, 1);
+    if (status == HAL_ERROR) {
+        uint32_t err = HAL_DMA_GetError(xDMA);
+        uint8_t str[10];
+        itoa(err, str, 16);
+        memcpy(pcWriteBuffer, str, strlen(str));
+        memcpy(pcWriteBuffer+strlen(str), pcDMATestErrorMessage, strlen(pcDMATestErrorMessage));
+    } else if (status == HAL_TIMEOUT) {
+        memcpy(pcWriteBuffer, pcDMATestTimeoutMessage, strlen(pcDMATestTimeoutMessage));
+    } else {
+        for (i = 0; i < 6; i++) {
+            if (dma_dest[i] != pcDMATestString[i]) {
+                memcpy(pcWriteBuffer, pcDMATestFailMessage, strlen(pcDMATestFailMessage));
+                return pdFALSE;
+            }
+        }
+        memcpy(pcWriteBuffer, pcDMATestPassMessage, strlen(pcDMATestPassMessage));
+    }
+
+    return pdFALSE;
+}
 
 /*-----------------------------------------------------------*/
 /* Utility Functions */

@@ -9,7 +9,7 @@
 /* Configure system clock for 216Mhz */
 static void prvSystemClockConfig(void);
 
-void vSetupHardware(UART_HandleTypeDef *xConsole, RNG_HandleTypeDef *xRNG) {
+void vSetupHardware(UART_HandleTypeDef *xConsole, RNG_HandleTypeDef *xRNG, ADC_HandleTypeDef *xADC, DMA_HandleTypeDef *xDMA) {
 
 	/* Set Interrupt Group Priority */
 	NVIC_SetPriorityGrouping((uint32_t)0x00000003U);
@@ -38,6 +38,39 @@ void vSetupHardware(UART_HandleTypeDef *xConsole, RNG_HandleTypeDef *xRNG) {
 
 	xRNG->Instance = RNG;
 	HAL_RNG_Init(xRNG);
+
+	memset(xADC, 0, sizeof(ADC_HandleTypeDef));
+	xADC->Instance = ADC1;
+	xADC->Init.ClockPrescaler = 1;
+	xADC->Init.Resolution = ADC_RESOLUTION_8B;
+	xADC->Init.DataAlign = ADC_DATAALIGN_RIGHT;
+	xADC->Init.ScanConvMode = DISABLE;
+	xADC->Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+	xADC->Init.ContinuousConvMode = DISABLE;
+
+	ADC_ChannelConfTypeDef sConfig;
+	sConfig.Channel = ADC_CHANNEL_3;
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+
+	HAL_ADC_Init(xADC);
+	HAL_ADC_ConfigChannel(xADC, &sConfig);
+
+
+	// Memory to memory transfer must be in fifo mode, on dma2
+	memset(xDMA, 0, sizeof(DMA_HandleTypeDef));
+	xDMA->Instance = DMA2_Stream0;
+	xDMA->Init.Channel = DMA_CHANNEL_0;
+	xDMA->Init.Direction = DMA_MEMORY_TO_MEMORY;
+	xDMA->Init.MemInc = DMA_MINC_ENABLE;
+	xDMA->Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+	xDMA->Init.Mode = DMA_NORMAL;
+	xDMA->Init.Priority = DMA_PRIORITY_LOW;
+	xDMA->Init.FIFOMode = DMA_FIFOMODE_ENABLE;
+	xDMA->Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
+
+	__HAL_RCC_DMA2_CLK_ENABLE();
+	HAL_DMA_Init(xDMA);
 }
 
 /*-----------------------------------------------------------*/
@@ -107,4 +140,19 @@ void HAL_UART_MspInit(UART_HandleTypeDef *husart) {
 
 void HAL_RNG_MspInit(RNG_HandleTypeDef *hrng) {
 	__HAL_RCC_RNG_CLK_ENABLE();
+}
+
+// ADC is fed by APB2 currently set to 108 Mhz
+void HAL_ADC_MspInit(ADC_HandleTypeDef *hadc) {
+    if (hadc->Instance == ADC1) {
+        __HAL_RCC_ADC1_CLK_ENABLE();
+
+        __HAL_RCC_GPIOA_CLK_ENABLE();
+        GPIO_InitTypeDef UG;
+        UG.Mode = GPIO_MODE_ANALOG;
+        UG.Pull = GPIO_NOPULL;
+        UG.Pin = GPIO_PIN_3;
+        HAL_GPIO_Init(GPIOA, &UG);
+    }
+
 }

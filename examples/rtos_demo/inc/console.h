@@ -6,7 +6,7 @@
 /*-----------------------------------------------------------*/
 /* Console Global Definitions */
 
-void vConsoleInit(RNG_HandleTypeDef *xRNG);
+void vConsoleInit(RNG_HandleTypeDef *xRNG, ADC_HandleTypeDef *xADC, DMA_HandleTypeDef *xDMA);
 void vCommandConsoleTask(void *pvParameters);
 
 

@@ -19,6 +19,7 @@
 #include "init.h"
 #include "console.h"
 
+
 /* Priorities at which the tasks are created. */
 #define mainCOMMAND_CONSOLE_TASK_PRIORITY	(tskIDLE_PRIORITY + 1)
 #define mainQUEUE_RECEIVE_TASK_PRIORITY		(tskIDLE_PRIORITY + 2)
@@ -35,6 +36,7 @@ the queue empty. */
 
 /*-----------------------------------------------------------*/
 
+
 static void prvQueueSendTask(void *pvParameters);
 static void prvQueueReceiveTask(void *pvParameters);
 
@@ -50,15 +52,22 @@ static QueueHandle_t xQueue = NULL;
 
 /* Console UART Handler Type */
 static UART_HandleTypeDef usart3;
+
 static RNG_HandleTypeDef rng;
+
+/* ADC command handle */
+static ADC_HandleTypeDef adc1;
+
+/* DMA command handle */
+static DMA_HandleTypeDef dma2;
 
 /*-----------------------------------------------------------*/
 
 int main(void) {
 	/* Configure the hardware ready to run the demo. */
-	vSetupHardware(&usart3, &rng);
+	vSetupHardware(&usart3, &rng, &adc1, &dma2);
 
-	vConsoleInit(&rng);
+	vConsoleInit(&rng, &adc1, &dma2);
 	xTaskCreate(vCommandConsoleTask, "console", configMINIMAL_STACK_SIZE*4, &usart3, mainCOMMAND_CONSOLE_TASK_PRIORITY, NULL);
 
 	/* Create the queue. */
@@ -135,7 +144,7 @@ static void prvQueueReceiveTask(void *pvParameters) {
 		is it the expected value?  If it is, toggle the LED. */
 		if( ulReceivedValue == ulExpectedValue )
 		{
-			mainTOGGLE_LED1();
+			boardTOGGLE_LED1();
 			ulReceivedValue = 0U;
 		}
 	}
@@ -209,7 +218,3 @@ void vApplicationTickHook( void ) {
 	HAL_IncTick();
 	HAL_SYSTICK_IRQHandler();
 }
-
-
-
-
