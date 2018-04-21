@@ -43,10 +43,6 @@ the queue empty. */
  */
 static void prvSetupHardware(void);
 
-#define LD1_PIN GPIO_PIN_0
-#define LD2_PIN GPIO_PIN_7
-#define LD3_PIN GPIO_PIN_14
-
 #define ADC_TIMEOUT 1
 
 /*
@@ -74,6 +70,11 @@ static UART_HandleTypeDef usart3;
 /* ADC command handle */
 static ADC_HandleTypeDef adc1;
 
+/* DMA command handle and test storage */
+#define DMA_TEST_SIZE 64
+static DMA_HandleTypeDef dma2;
+static volatile uint32_t dma_dest[DMA_TEST_SIZE];
+
 /*-----------------------------------------------------------*/
 /* Command Line Definitions */
 
@@ -82,6 +83,7 @@ static BaseType_t prvToggleLEDCommand(char*, size_t, const char*);
 static BaseType_t prvFreqCommand(char*, size_t, const char*);
 static BaseType_t prvSampleADC(char*, size_t, const char*);
 static BaseType_t prvSystemReset(char*, size_t, const char*);
+static BaseType_t prvDMATest(char*, size_t, const char*);
 
 static const CLI_Command_Definition_t xToggleLEDCommand = {
     "toggle-led",
@@ -111,6 +113,13 @@ static const CLI_Command_Definition_t xSystemReset = {
 	0
 };
 
+static const CLI_Command_Definition_t xDMATest = {
+	"dma-test",
+	"dma-test: Perform a memory-memory dma test",
+	prvDMATest,
+	0
+};
+
 /*-----------------------------------------------------------*/
 
 int main(void) {
@@ -121,6 +130,7 @@ int main(void) {
 	FreeRTOS_CLIRegisterCommand(&xFreqCommand);
 	FreeRTOS_CLIRegisterCommand(&xSampleADCCommand);
 	FreeRTOS_CLIRegisterCommand(&xSystemReset);
+	FreeRTOS_CLIRegisterCommand(&xDMATest);
 	xTaskCreate(vCommandConsoleTask, "console", configMINIMAL_STACK_SIZE*4, &usart3, mainCOMMAND_CONSOLE_TASK_PRIORITY, NULL);
 
 	/* Create the queue. */
@@ -249,6 +259,21 @@ static void prvSetupHardware(void) {
 	HAL_ADC_Init(&adc1);
 	HAL_ADC_ConfigChannel(&adc1, &sConfig);
 
+
+	// Memory to memory transfer must be in fifo mode, on dma2
+	memset(&dma2, 0, sizeof(DMA_HandleTypeDef));
+	dma2.Instance = DMA2_Stream0;
+	dma2.Init.Channel = DMA_CHANNEL_0;
+	dma2.Init.Direction = DMA_MEMORY_TO_MEMORY;
+	dma2.Init.MemInc = DMA_MINC_ENABLE;
+	dma2.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+	dma2.Init.Mode = DMA_NORMAL;
+	dma2.Init.Priority = DMA_PRIORITY_LOW;
+	dma2.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
+	dma2.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
+
+	__HAL_RCC_DMA2_CLK_ENABLE();
+	HAL_DMA_Init(&dma2);
 }
 
 /*-----------------------------------------------------------*/
@@ -602,6 +627,56 @@ static BaseType_t prvSystemReset(char *pcWriteBuffer,
 	(void)pcCommandString;
 
 	NVIC_SystemReset();
+
+	return pdFALSE;
+}
+
+/*-----------------------------------------------------------*/
+
+static const char* const pcDMATestErrorMessage =
+	": Error During DMA\r\n";
+
+static const char* const pcDMATestTimeoutMessage =
+	"DMA Timeout\r\n";
+
+static const char* const pcDMATestPassMessage = 
+	"DMA Passed\r\n";
+
+static const char* const pcDMATestFailMessage =
+	"DMA Failed\r\n";
+
+static const uint32_t* const pcDMATestString = 
+	{12, 36, 42, 33, 445, 543};
+
+// Todo don't wait forever, just check and if not ready then return pdTrue!
+static BaseType_t prvDMATest(char *pcWriteBuffer,
+									size_t xWriteBufferLen,
+									const char *pcCommandString) {
+
+	(void)xWriteBufferLen;
+	(void)pcCommandString;
+
+	int i;
+
+	HAL_DMA_Start(&dma2, pcDMATestString, dma_dest, 6);
+	HAL_StatusTypeDef status = HAL_DMA_PollForTransfer(&dma2, HAL_DMA_FULL_TRANSFER, 1);
+	if (status == HAL_ERROR) {
+		uint32_t err = HAL_DMA_GetError(&dma2);
+		uint8_t str[10];
+		itoa(err, str, 16);
+		memcpy(pcWriteBuffer, str, strlen(str));
+		memcpy(pcWriteBuffer+strlen(str), pcDMATestErrorMessage, strlen(pcDMATestErrorMessage));
+	} else if (status == HAL_TIMEOUT) {
+		memcpy(pcWriteBuffer, pcDMATestTimeoutMessage, strlen(pcDMATestTimeoutMessage));
+	} else {
+		for (i = 0; i < 6; i++) {
+			if (dma_dest[i] != pcDMATestString[i]) {
+				memcpy(pcWriteBuffer, pcDMATestFailMessage, strlen(pcDMATestFailMessage));
+				return pdFALSE;
+			}
+		}
+		memcpy(pcWriteBuffer, pcDMATestPassMessage, strlen(pcDMATestPassMessage));
+	}
 
 	return pdFALSE;
 }
